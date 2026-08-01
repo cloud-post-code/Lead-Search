@@ -10,8 +10,8 @@ FIELDNAMES = [
     "org_id", "org_name", "org_type", "org_type_notes", "geographic_scope",
     "areas_served", "website", "description", "source_urls", "status",
     "last_updated", "contact_name", "contact_title", "relevance_reason",
-    "email", "phone", "contact_method", "linkedin_url", "linkedin_confidence",
-    "outreach_message",
+    "email", "email_source_url", "phone", "contact_method", "linkedin_url",
+    "linkedin_confidence", "outreach_message",
 ]
 
 
@@ -72,6 +72,7 @@ def build_rows(orgs: list, contacts: list) -> list[dict]:
                 "contact_title": c.title,
                 "relevance_reason": relevance.get(c.name, ""),
                 "email": c.email or "",
+                "email_source_url": c.email_source_url or "",
                 "phone": c.phone or "",
                 "contact_method": c.contact_method,
                 "linkedin_url": c.linkedin_url or "",

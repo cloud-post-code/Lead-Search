@@ -10,6 +10,7 @@ Ported from a Claude Code multi-agent Workflow into a standalone tool built on t
 2. **Verify** — dedupes candidates against the existing registry (tolerant name matching), rejects wrong-area false positives (same-name/different-state traps), and gates on whether each org genuinely matches the requested type.
 3. **Research** — per new org, in parallel: official website, refined type, geographic scope, a description written from the org's own site content, and 1-3 key people.
 4. **Contacts** — per person, in parallel: publicly listed email/phone (never guessed, never de-obfuscated), LinkedIn profile with honest confidence rating, and an optional custom outreach draft.
+5. **Email hunt** (on by default; `--no-email-hunt` to skip) — for contacts whose org pages published no email, a second search across legitimate public sources: personal sites, GitHub profile pages, academic paper author blocks, conference speaker bios, university pages, press releases, podcast/newsletter about-pages, and social bios. Only verbatim-published addresses count — no format-pattern guessing, no enrichment/scraping services (Hunter, Apollo, ZoomInfo, etc.), no de-obfuscation. Each found address records its source URL in `email_source_url`.
 
 ## Install
 

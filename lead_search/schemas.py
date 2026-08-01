@@ -58,8 +58,23 @@ class Contact(BaseModel):
     org_name: str
     title: str
     email: Optional[str] = None
+    email_source_url: Optional[str] = None
     phone: Optional[str] = None
     contact_method: str  # email | phone | email_and_phone | linkedin_only | org_contact_form | none_found
     linkedin_url: Optional[str] = None
     linkedin_confidence: str  # confirmed | likely | not_found
     outreach_message: Optional[str] = None
+
+
+class EmailHuntResult(BaseModel):
+    """Result of the deep email hunt: published-source-only, no guessing."""
+
+    name: str
+    email_status: str  # found | not_published | only_masked_found
+    email: Optional[str] = None
+    email_source_url: Optional[str] = None
+    email_source_context: Optional[str] = None
+    email_source_type: str = "none"  # personal_site | github_profile | academic_paper | conference_bio | university_page | press_release | podcast_or_newsletter | social_profile_bio | company_page | other | none
+    email_is_stale_risk: bool = False
+    phone: Optional[str] = None
+    identity_confidence: str = "likely"  # confirmed | likely

@@ -25,6 +25,10 @@ def main(argv=None) -> int:
     parser.add_argument("--out", default="runs", help="Directory for raw run logs (default: runs/)")
     parser.add_argument("--model", default="claude-opus-5", help="Claude model ID (default: claude-opus-5)")
     parser.add_argument("--workers", type=int, default=4, help="Parallel research workers (default: 4)")
+    parser.add_argument(
+        "--no-email-hunt", action="store_true",
+        help="Skip the deep email hunt for contacts without a published email",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -40,6 +44,7 @@ def main(argv=None) -> int:
         sender=args.sender,
         model=args.model,
         workers=args.workers,
+        deep_email_hunt=not args.no_email_hunt,
     )
     registry_path = Path(args.registry)
     known = load_registry_snapshot(registry_path)

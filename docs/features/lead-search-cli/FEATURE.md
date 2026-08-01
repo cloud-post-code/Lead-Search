@@ -9,5 +9,6 @@ A UI-free CLI that runs a four-stage org-search pipeline (Discover → Verify �
 - Contacts join to orgs via a stable `org_id` slug echoed through the contact stage (no free-text name joins).
 - Contacts without email/phone are kept with a `contact_method` classification, never silently dropped.
 - Outreach drafting is optional, gated on `--purpose`.
+- A deep email hunt stage (default on, `--no-email-hunt` to disable) re-searches contacts lacking a published email across legitimate public sources (personal sites, GitHub profiles, academic papers, conference bios, press pages). Only verbatim-published addresses are accepted — no format-pattern guessing, no enrichment/scraping services, no de-obfuscation — and every found address records its source URL.
 - Refusals (`stop_reason == "refusal"`) and `pause_turn` continuations are handled; a declined item is skipped with a warning, not a crash.
 - No UI of any kind; output is CSV + JSON run logs + terminal summary.

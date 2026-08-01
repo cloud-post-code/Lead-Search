@@ -6,7 +6,13 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from .claude_client import ClaudeRunner, RefusalError
-from .schemas import Contact, DiscoveryResult, OrgDetail, VerificationResult
+from .schemas import (
+    Contact,
+    DiscoveryResult,
+    EmailHuntResult,
+    OrgDetail,
+    VerificationResult,
+)
 from .storage import slugify
 
 log = logging.getLogger("lead_search")
@@ -20,6 +26,7 @@ class RunConfig:
     sender: str = ""
     model: str = "claude-opus-5"
     workers: int = 4
+    deep_email_hunt: bool = True
 
 
 def discover(runner: ClaudeRunner, cfg: RunConfig) -> list:
@@ -133,6 +140,47 @@ def find_contact(runner: ClaudeRunner, cfg: RunConfig, org: OrgDetail, person) -
     return runner.research_and_extract(prompt, Contact)
 
 
+def hunt_email(runner: ClaudeRunner, contact: Contact) -> EmailHuntResult:
+    """Search legitimate public sources for a genuinely PUBLISHED email — never guessed."""
+    prompt = (
+        f"Find a publicly PUBLISHED email address (and phone, if published) for: "
+        f"{contact.name}, {contact.title} at {contact.org_name}. "
+        f"LinkedIn: {contact.linkedin_url or 'unknown'}\n\n"
+        "STRICT RULES:\n"
+        "- Only report an email you can see VERBATIM on a page you actually fetched. Record "
+        "the exact URL and quote the surrounding context. If you did not see the literal "
+        'address on a fetched page, email_status is not "found".\n'
+        "- NO pattern guessing: never construct addresses from name/company format "
+        "conventions.\n"
+        "- NO enrichment or contact-scraping services (Hunter, Apollo, RocketReach, "
+        "ZoomInfo, ContactOut, Lusha, or similar) — their data is aggregated/guessed.\n"
+        "- NO de-obfuscation of script- or image-protected addresses; transcribing a "
+        'deliberate "name [at] domain" spelling the person published themselves is fine. '
+        'Set email_status "only_masked_found" when only protected addresses exist.\n\n'
+        "WHERE TO LOOK: personal website/blog contact pages; GitHub profile page or profile "
+        "README (profile only — do not mine commit metadata); academic papers (arXiv, ACM, "
+        "IEEE author blocks); conference speaker bios; university/guest-lecturer pages; "
+        "press releases with a direct contact; podcast/newsletter about-pages; social "
+        "profile bios where the person lists an address themselves.\n\n"
+        "IDENTITY CHECK: confirm the address belongs to THIS person (name + role/company "
+        "context align), not a namesake; set identity_confidence honestly. If the source is "
+        "old or a previous employer, still report it but set email_is_stale_risk true.\n"
+        "Prefer current-company > personal > stale old-employer address. If nothing is "
+        'genuinely published, return email_status "not_published" — an honest, valid result.'
+    )
+    return runner.research_and_extract(prompt, EmailHuntResult)
+
+
+def _apply_email_hunt(contact: Contact, hunt: EmailHuntResult) -> None:
+    if hunt.email_status != "found" or not hunt.email:
+        return
+    contact.email = hunt.email
+    contact.email_source_url = hunt.email_source_url
+    if hunt.phone and not contact.phone:
+        contact.phone = hunt.phone
+    contact.contact_method = "email_and_phone" if contact.phone else "email"
+
+
 def run_pipeline(cfg: RunConfig, known_registry: list) -> dict:
     runner = ClaudeRunner(model=cfg.model)
 
@@ -178,5 +226,23 @@ def run_pipeline(cfg: RunConfig, known_registry: list) -> dict:
     with ThreadPoolExecutor(max_workers=cfg.workers) as pool:
         contacts = [c for c in pool.map(safe_contact, contact_work) if c]
     log.info("Contacts: %d contacts found", len(contacts))
+
+    if cfg.deep_email_hunt:
+        needy = [c for c in contacts if not c.email]
+        log.info("Email hunt: %d contacts lack a published email, deep-searching", len(needy))
+
+        def safe_hunt(contact):
+            try:
+                return contact, hunt_email(runner, contact)
+            except RefusalError:
+                log.warning("Email hunt declined for %s — skipping", contact.name)
+                return contact, None
+
+        with ThreadPoolExecutor(max_workers=cfg.workers) as pool:
+            for contact, hunt in pool.map(safe_hunt, needy):
+                if hunt:
+                    _apply_email_hunt(contact, hunt)
+        found = sum(1 for c in needy if c.email)
+        log.info("Email hunt: %d/%d published emails found", found, len(needy))
 
     return {"candidates": candidates, "verdicts": verdicts, "orgs": orgs, "contacts": contacts}
